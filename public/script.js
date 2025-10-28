@@ -12,8 +12,11 @@ import {
     getAvailableRooms,
     addRoom,
     assignRoom,
-    getPatientById
-} from './firebase-service.js';
+    getPatientById,
+    checkIfPatientExists
+}
+
+from './firebase-service.js';
 
 // Global variables
 let unsubscribePatients = null;
@@ -81,47 +84,76 @@ function setupFormHandlers() {
     }
 }
 
+
 async function handleNewPatientSubmit(e) {
     e.preventDefault();
     
+    // Collect symptoms
     const symptoms = [];
     document.querySelectorAll('.checkbox-item input:checked').forEach(checkbox => {
         symptoms.push(checkbox.value);
     });
     
+    // Collect vitals
     const vitals = {
         bloodPressure: document.getElementById('newBP').value || '',
         pulse: parseInt(document.getElementById('newPulse').value) || 0,
         temperature: parseFloat(document.getElementById('newTemp').value) || 0
     };
-    
+
+    // Get name & contact
+    const name = document.getElementById('newName').value.trim();
+    const contact = document.getElementById('newContact').value.trim();
+
+    if (!name || !contact) {
+        alert("⚠ Please enter both name and contact number.");
+        return;
+    }
+
+    // Check if patient already exists
+    const { checkIfPatientExists } = await import('./firebase-service.js');
+    const existResult = await checkIfPatientExists(name, contact);
+
+    if (existResult.exists) {
+        const existing = existResult.data;
+        alert(
+          `⚠ Patient already exists!\n\nName: ${existing.name}\nContact: ${existing.contact}\nStatus: ${existing.status?.toUpperCase() || 'N/A'}\nPriority: ${existing.priority?.toUpperCase() || 'N/A'}`
+        );
+        return; // Stop here — don’t register again
+    }
+
+    // Calculate priority
     const priority = calculatePriority(symptoms, vitals);
     
+    // Prepare patient data
     const patientData = {
-        name: document.getElementById('newName').value,
+        name,
         age: document.getElementById('newAge').value,
-        contact: document.getElementById('newContact').value,
+        contact,
         complaint: document.getElementById('newComplaint').value,
-        symptoms: symptoms,
-        vitals: vitals,
-        priority: priority
+        symptoms,
+        vitals,
+        priority
     };
     
+    // Show loading
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = 'Registering...';
     submitBtn.disabled = true;
     
+    // Add to Firebase
     const result = await addPatient(patientData);
     
     if (result.success) {
-        alert(`✅ Patient registered successfully!\n\nPriority: ${priority.toUpperCase()}\nPatient ID: ${result.id}`);
+       ` alert(✅ Patient registered successfully!\n\nPriority: ${priority.toUpperCase()}\nPatient ID: ${result.id});`
         e.target.reset();
         loadStatistics();
     } else {
-        alert(`❌ Error: ${result.message}`);
+        `alert(❌ Error: ${result.message});`
     }
     
+    // Restore button
     submitBtn.textContent = originalText;
     submitBtn.disabled = false;
 }

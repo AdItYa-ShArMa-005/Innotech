@@ -607,3 +607,24 @@ export function formatWaitTime(checkInTime) {
     const mins = diff % 60;
     return `${hours}h ${mins}m`;
 }
+// ==================== CHECK IF PATIENT EXISTS ====================
+export async function checkIfPatientExists(name, contact) {
+  try {
+    const patientsRef = collection(db, "patients");
+    const q = query(
+      patientsRef,
+      where("name", "==", name),
+      where("contact", "==", contact)
+    );
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      return { exists: true, data: snapshot.docs[0].data() };
+    } else {
+      return { exists: false };
+    }
+  } catch (error) {
+    console.error("Error checking patient existence:", error);
+    return { exists: false, error: error.message };
+  }
+}
