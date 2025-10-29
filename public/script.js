@@ -14,9 +14,22 @@ import {
     assignRoom,
     getPatientById,
     checkIfPatientExists
-}
+} from './firebase-service.js';
 
-from './firebase-service.js';
+// Import custom popup utilities
+import {
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
+    showConfirm,
+    showPatientExists,
+    showPatientRegistered,
+    showRoomAssigned,
+    showPatientDischarged,
+    showConfirmDischarge,
+    showPatientDetails
+} from './popup-utils.js';
 
 // Global variables
 let unsubscribePatients = null;
@@ -30,30 +43,28 @@ const priorityOrder = { red: 1, yellow: 2, green: 3 };
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('🚀 Triage System Initialized');
     
-    // Start listening for real-time patient updates
     startRealtimeUpdates();
     
-    // Check existing rooms first
     const roomsResult = await getAvailableRooms();
     if (roomsResult.success && roomsResult.data.length === 0) {
-        // Only create rooms if none exist
         await addRoom({roomNumber: `R${1}`});
         await addRoom({roomNumber: `R${2}`});
         await addRoom({roomNumber: `R${3}`});
         await addRoom({roomNumber: `R${4}`});
         await addRoom({roomNumber: `R${5}`});
+        await addRoom({roomNumber: `R${6}`});
+        await addRoom({roomNumber: `R${7}`});
+        await addRoom({roomNumber: `R${8}`});
+        await addRoom({roomNumber: `R${9}`});
+        await addRoom({roomNumber: `R${10}`});
+        await addRoom({roomNumber: `R${11}`});
+        await addRoom({roomNumber: `R${12}`});
     }
     
-    // Start listening for real-time room updates
     startRoomUpdates();
-    
-    // Load statistics
     loadStatistics();
-    
-    // Set up form handlers
     setupFormHandlers();
     
-    // Update statistics every 30 seconds
     setInterval(loadStatistics, 30000);
 });
 
@@ -84,17 +95,14 @@ function setupFormHandlers() {
     }
 }
 
-
 async function handleNewPatientSubmit(e) {
     e.preventDefault();
     
-    // Collect symptoms
     const symptoms = [];
     document.querySelectorAll('.checkbox-item input:checked').forEach(checkbox => {
         symptoms.push(checkbox.value);
     });
     
-    // Collect vitals
     const vitals = {
         bloodPressure: document.getElementById('newBP').value || '',
         pulse: parseInt(document.getElementById('newPulse').value) || 0,
@@ -110,47 +118,57 @@ async function handleNewPatientSubmit(e) {
         return;
     }
 
-    // Check if patient already exists
+        // Check if patient already exists
     // const { checkIfPatientExists } = await import('./firebase-service.js');
+    // Check if patient already exists
     const existResult = await checkIfPatientExists(name, contact);
 
     if (existResult.exists) {
         const existing = existResult.data;
-        alert(
-          `⚠ Patient already exists!\n\nName: ${existing.name}\nContact: ${existing.contact}\nStatus: ${existing.status?.toUpperCase() || 'N/A'}\nPriority: ${existing.priority?.toUpperCase() || 'N/A'}`
-        );
+
+        // ✅ Use custom popup instead of alert
+        await showPatientExists({
+            name: existing.name,
+            contact: existing.contact,
+            status: existing.status?.toUpperCase() || "N/A",
+            priority: existing.priority?.toUpperCase() || "N/A"
+        });
+
         return; // Stop here — don’t register again
     }
 
-    // Calculate priority
+    
     const priority = calculatePriority(symptoms, vitals);
     
-    // Prepare patient data
     const patientData = {
-        name,
+        name: document.getElementById('newName').value,
         age: document.getElementById('newAge').value,
-        contact,
+        contact: document.getElementById('newContact').value,
         complaint: document.getElementById('newComplaint').value,
-        symptoms,
-        vitals,
-        priority
+        symptoms: symptoms,
+        vitals: vitals,
+        priority: priority
     };
     
-    // Show loading
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = 'Registering...';
     submitBtn.disabled = true;
     
-    // Add to Firebase
     const result = await addPatient(patientData);
     
     if (result.success) {
-       ` alert(✅ Patient registered successfully!\n\nPriority: ${priority.toUpperCase()}\nPatient ID: ${result.id});`
+        // Use custom popup instead of alert
+        await showPatientRegistered(priority, result.id);
+        
+        // Reset form
         e.target.reset();
+        
+        // Reload statistics
         loadStatistics();
     } else {
-        `alert(❌ Error: ${result.message});`
+        // Use custom error popup instead of alert
+        await showError('Registration Failed', result.message);
     }
     
     // Restore button
@@ -164,7 +182,7 @@ async function handleSearchSubmit(e) {
     const query = document.getElementById('searchQuery').value.trim();
     
     if (!query) {
-        alert('Please enter a search term');
+        await showWarning('Search Required', 'Please enter a search term (name or contact number).');
         return;
     }
     
@@ -255,34 +273,12 @@ window.viewPatientDetails = async function(patientId) {
     
     if (result.success) {
         const patient = result.data;
-        const symptoms = patient.symptoms?.join(', ') || 'None';
-        const vitals = patient.vitals || {};
         const waitTime = formatWaitTime(patient.checkInTime);
         
-        const details = `
-Patient Details:
-
-Name: ${patient.name}
-Age: ${patient.age}
-Contact: ${patient.contact}
-Complaint: ${patient.complaint}
-Priority: ${patient.priority.toUpperCase()}
-Status: ${patient.status.toUpperCase()}
-
-Symptoms: ${symptoms}
-
-Vital Signs:
-- Blood Pressure: ${vitals.bloodPressure || 'N/A'}
-- Pulse: ${vitals.pulse || 'N/A'} bpm
-- Temperature: ${vitals.temperature || 'N/A'} °F
-
-Wait Time: ${waitTime}
-Notes: ${patient.notes || 'None'}
-        `;
-        
-        alert(details);
+        // Use custom popup instead of alert
+        await showPatientDetails(patient, waitTime);
     } else {
-        alert(`Error: ${result.message}`);
+        await showError('Error', result.message);
     }
 }
 
@@ -336,9 +332,6 @@ function startRoomUpdates() {
     });
 }
 
-/**
- * Render rooms grid - NOW WITH CLICK FUNCTIONALITY
- */
 function renderRooms(rooms) {
     const roomsList = document.getElementById('roomsList');
     
@@ -351,7 +344,6 @@ function renderRooms(rooms) {
         const statusClass = room.status === 'available' ? 'available' : 'occupied';
         const statusText = room.status === 'available' ? 'AVAILABLE' : 'OCCUPIED';
         
-        // Make room clickable if occupied
         const clickable = room.status === 'occupied' ? 
             `onclick="showRoomPatientDetails('${room.id}', '${room.assignedPatientId}', '${room.assignedPatientName?.replace(/'/g, "\\'")}', '${room.roomNumber}')" style="cursor: pointer;"` : 
             '';
@@ -367,22 +359,18 @@ function renderRooms(rooms) {
     }).join('');
 }
 
-/**
- * NEW FUNCTION: Show patient details when room is clicked
- */
 window.showRoomPatientDetails = async function(roomId, patientId, patientName, roomNumber) {
     console.log('Room clicked:', roomNumber, 'Patient:', patientName);
     
     if (!patientId) {
-        alert('No patient assigned to this room');
+        await showWarning('No Patient', 'No patient is assigned to this room.');
         return;
     }
     
-    // Get full patient details
     const result = await getPatientById(patientId);
     
     if (!result.success) {
-        alert(`Error loading patient details: ${result.message}`);
+        await showError('Error', `Failed to load patient details: ${result.message}`);
         return;
     }
     
@@ -391,7 +379,7 @@ window.showRoomPatientDetails = async function(roomId, patientId, patientName, r
     const vitals = patient.vitals || {};
     const waitTime = formatWaitTime(patient.checkInTime);
     
-    // Create a custom modal with patient details and discharge button
+    // Create custom popup with discharge button
     const modal = document.createElement('div');
     modal.id = 'patientDetailsModal';
     modal.style.cssText = `
@@ -417,7 +405,7 @@ window.showRoomPatientDetails = async function(roomId, patientId, patientName, r
                 <p style="margin: 8px 0;"><strong>Age:</strong> ${patient.age} years</p>
                 <p style="margin: 8px 0;"><strong>Contact:</strong> ${patient.contact}</p>
                 <p style="margin: 8px 0;"><strong>Complaint:</strong> ${patient.complaint}</p>
-                <p style="margin: 8px 0;"><strong>Priority:</strong> <span style="background: ${patient.priority === 'red' ? '#ef5350' : patient.priority === 'yellow' ? '#ffa726' : '#66bb6a'}; color: white; padding: 4px 12px; border-radius: 12px; font-weight: bold;">${patient.priority.toUpperCase()}</span></p>
+                <p style="margin: 8px 0;"><strong>Priority:</strong> <span style="background: ${getPriorityColor(patient.priority)}; color: white; padding: 4px 12px; border-radius: 12px; font-weight: bold;">${patient.priority.toUpperCase()}</span></p>
                 <p style="margin: 8px 0;"><strong>Status:</strong> ${patient.status.toUpperCase()}</p>
                 <p style="margin: 8px 0;"><strong>Wait Time:</strong> ${waitTime}</p>
                 <p style="margin: 8px 0;"><strong>Assigned Room:</strong> ${roomNumber}</p>
@@ -451,7 +439,6 @@ window.showRoomPatientDetails = async function(roomId, patientId, patientName, r
     
     document.body.appendChild(modal);
     
-    // Close modal when clicking outside
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             closePatientDetailsModal();
@@ -459,9 +446,15 @@ window.showRoomPatientDetails = async function(roomId, patientId, patientName, r
     });
 }
 
-/**
- * NEW FUNCTION: Close patient details modal
- */
+function getPriorityColor(priority) {
+    const colors = {
+        'red': '#ef5350',
+        'yellow': '#ffa726',
+        'green': '#66bb6a'
+    };
+    return colors[priority] || '#999';
+}
+
 window.closePatientDetailsModal = function() {
     const modal = document.getElementById('patientDetailsModal');
     if (modal) {
@@ -469,20 +462,19 @@ window.closePatientDetailsModal = function() {
     }
 }
 
-/**
- * NEW FUNCTION: Discharge patient from room modal
- */
 window.dischargePatientFromRoom = async function(patientId, patientName, roomId, roomNumber) {
-    if (confirm(`Are you sure you want to discharge ${patientName}?\n\nThis will:\n✓ Remove patient from database\n✓ Free up Room ${roomNumber}`)) {
-        
+    // Use custom confirm popup instead of alert
+    const confirmed = await showConfirmDischarge(patientName, roomNumber);
+    
+    if (confirmed) {
         const result = await dischargePatient(patientId, patientName, roomId);
         
         if (result.success) {
-            alert(`✅ ${patientName} has been discharged successfully!\n\nRoom ${roomNumber} is now available.`);
+            await showPatientDischarged(patientName, roomNumber);
             closePatientDetailsModal();
             loadStatistics();
         } else {
-            alert(`❌ Error: ${result.message}`);
+            await showError('Discharge Failed', result.message);
         }
     }
 }
@@ -528,7 +520,7 @@ window.showRoomAssignment = async function(patientId, patientName) {
 
 window.assignRoomToPatient = async function(roomId, roomNumber) {
     if (!currentPatientForRoom) {
-        alert('❌ Error: No patient selected');
+        await showError('Error', 'No patient selected.');
         return;
     }
     
@@ -546,11 +538,11 @@ window.assignRoomToPatient = async function(roomId, roomNumber) {
     console.log('Assignment result:', result);
     
     if (result.success) {
-        alert(`✅ Room ${roomNumber} assigned to ${currentPatientForRoom.name}`);
+        await showRoomAssigned(roomNumber, currentPatientForRoom.name);
         closeRoomModal();
         loadStatistics();
     } else {
-        alert(`❌ Error assigning room: ${result.message}`);
+        await showError('Room Assignment Failed', result.message);
         showRoomAssignment(currentPatientForRoom.id, currentPatientForRoom.name);
     }
 }
@@ -561,22 +553,28 @@ window.closeRoomModal = function() {
 }
 
 window.confirmDischarge = async function(patientId, patientName) {
-    if (confirm(`Are you sure you want to discharge ${patientName}?\n\nThis will:\n- Remove patient from database\n- Free up assigned room (if any)`)) {
-        
-        const patientResult = await getPatientById(patientId);
-        let roomId = null;
-        
-        if (patientResult.success && patientResult.data.assignedRoom) {
-            roomId = patientResult.data.assignedRoom;
-        }
-        
+    // Get patient details first
+    const patientResult = await getPatientById(patientId);
+    let roomId = null;
+    let roomNumber = null;
+    
+    if (patientResult.success && patientResult.data.assignedRoom) {
+        roomId = patientResult.data.assignedRoom;
+        // You might need to fetch room details to get room number
+        // For now, we'll just use the room ID
+    }
+    
+    // Use custom confirm popup
+    const confirmed = await showConfirmDischarge(patientName, roomNumber);
+    
+    if (confirmed) {
         const result = await dischargePatient(patientId, patientName, roomId);
         
         if (result.success) {
-            alert(`✅ ${patientName} has been discharged successfully and removed from the system`);
+            await showPatientDischarged(patientName, roomNumber);
             loadStatistics();
         } else {
-            alert(`❌ Error: ${result.message}`);
+            await showError('Discharge Failed', result.message);
         }
     }
 }
