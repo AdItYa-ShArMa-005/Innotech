@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Register Staff</title>
+<link rel="stylesheet" href="staff-register.css" />
+</head>
+<body>
+<div class="register-container">
+<h2>Create Staff Account</h2>
+<div class="input-group"><label>Email</label><input type="email" id="reg-email"/></div>
+<div class="input-group"><label>Password</label><input type="password" id="reg-password"/></div>
+<div class="input-group"><label>Role</label>
+<select id="reg-role"><option value="doctor">Doctor</option><option value="nurse">Nurse</option><option value="admin">Admin</option></select></div>
+<button onclick="registerStaff()">Create Account</button>
+<p class="link" onclick="goToLogin()">Back to Login</p>
+</div>
+<script type="module" src="staff-register.js"></script>
+</body>
+</html>

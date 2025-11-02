@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Staff Login | Emergency Triage System</title>
+<link rel="stylesheet" href="staff-login.css" />
+</head>
+<body>
+<div class="login-container">
+<div class="logo">🏥</div>
+<h2>Staff Login</h2>
+<div class="input-group"><label>Email</label>
+<input type="email" id="email" placeholder="Enter email" /></div>
+<div class="input-group"><label>Password</label>
+<input type="password" id="password" placeholder="Enter password" /></div>
+<div class="input-group"><label>Role</label>
+<select id="role"><option value="doctor">Doctor</option>
+<option value="nurse">Nurse</option><option value="admin">Admin</option></select></div>
+<button onclick="staffLogin()">Login</button>
+<p class="footer-text">Emergency Triage & Routing System</p>
+<p class="link" onclick="goToReset()">Forgot password?</p>
+<p class="link" onclick="goToRegister()">Create staff account</p>
+</div>
+<script type="module" src="staff-login.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+if(!localStorage.getItem("staffUID")){ alert("Please login first!"); window.location.href="staff-login.html"; }
