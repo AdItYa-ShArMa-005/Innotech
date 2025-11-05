@@ -69,7 +69,7 @@ async function onLogin(){
     // Show success with autoClose
     await showSuccess('Welcome', 'Login successful. Redirecting...', {
       autoClose: true,
-      timeout: 1000
+      timeout: 500
     });
 
     // Redirect after delay

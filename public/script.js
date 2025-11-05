@@ -16,6 +16,12 @@ import {
     checkIfPatientExists
 } from './firebase-service.js';
 
+// Import API service for AI analysis
+import {
+    analyzeSymptoms,
+    checkAPIHealth
+} from './api-service.js';
+
 // Import custom popup utilities
 import {
     showSuccess,
@@ -35,6 +41,7 @@ import {
 let unsubscribePatients = null;
 let unsubscribeRooms = null;
 let currentPatientForRoom = null;
+let aiAnalysisResult = null; // Store AI analysis
 
 // Priority order mapping for sorting
 const priorityOrder = { red: 1, yellow: 2, green: 3 };
@@ -42,6 +49,14 @@ const priorityOrder = { red: 1, yellow: 2, green: 3 };
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('🚀 Triage System Initialized');
+    
+    // Check API health
+    const apiHealth = await checkAPIHealth();
+    if (apiHealth.healthy) {
+        console.log('✅ AI Analysis API is running');
+    } else {
+        console.warn('⚠️ AI Analysis API is not available. Using fallback priority calculation.');
+    }
     
     startRealtimeUpdates();
     
@@ -64,6 +79,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     startRoomUpdates();
     loadStatistics();
     setupFormHandlers();
+    setupRealTimeAnalysis(); // NEW: Add real-time analysis
     
     setInterval(loadStatistics, 30000);
 });
@@ -81,6 +97,167 @@ function startRealtimeUpdates() {
     });
 }
 
+// ==================== NEW: REAL-TIME SYMPTOM ANALYSIS ====================
+
+function setupRealTimeAnalysis() {
+    const complaintField = document.getElementById('newComplaint');
+    const ageField = document.getElementById('newAge');
+    let analysisTimeout = null;
+    
+    if (!complaintField) {
+        console.error('❌ Chief complaint field not found!');
+        return;
+    }
+    
+    // Create AI suggestion display area
+    const formGroup = complaintField.parentElement;
+    const suggestionDiv = document.createElement('div');
+    suggestionDiv.id = 'aiSuggestion';
+    // suggestionDiv.style.cssText = `
+    //     margin-top: 10px;
+    //     padding: 15px 20px;
+    //     border-radius: 8px;
+    //     display: none;
+    //     color: white;
+    //     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    // `;
+    // formGroup.appendChild(suggestionDiv);
+    
+    async function performAnalysis() {
+        const complaint = complaintField.value.trim();
+        const age = parseInt(ageField.value) || null;
+        
+        // ✅ Changed from 5 to 3 characters for faster response
+        if (complaint.length < 3) {
+            suggestionDiv.style.display = 'none';
+            aiAnalysisResult = null;
+            return;
+        }
+        
+        // Show loading with animation
+        suggestionDiv.style.display = 'block';
+        suggestionDiv.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        suggestionDiv.innerHTML = `
+            <div style="display: flex; align-items: center; color: white;">
+                <div style="width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px;"></div>
+                <span style="font-weight: 500;">🤖 AI analyzing symptoms...</span>
+            </div>
+            <style>
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+        
+        // Get selected symptoms
+        const selectedSymptoms = [];
+        document.querySelectorAll('.checkbox-item input:checked').forEach(checkbox => {
+            selectedSymptoms.push(checkbox.value);
+        });
+        
+        // Get vitals
+        const vitals = {
+            bloodPressure: document.getElementById('newBP').value || '',
+            pulse: parseInt(document.getElementById('newPulse').value) || 0,
+            temperature: parseFloat(document.getElementById('newTemp').value) || 0
+        };
+        
+        // Call AI analysis
+        const result = await analyzeSymptoms(complaint, age, vitals, selectedSymptoms);
+        
+        if (result.success) {
+            aiAnalysisResult = result.data;
+            displayAIAnalysis(result.data);
+            console.log('✅ AI Analysis:', result.data);
+        } else {
+            suggestionDiv.style.background = '#ff9800';
+            suggestionDiv.innerHTML = `
+                <div style="color: white; font-weight: 500;">
+                    ⚠️ AI analysis unavailable. Manual priority will be used.
+                </div>
+                <div style="color: white; font-size: 12px; margin-top: 5px; opacity: 0.9;">
+                    ${result.message || 'API not responding'}
+                </div>
+            `;
+            aiAnalysisResult = null;
+        }
+    }
+    
+    // ✅ Changed from 1000ms to 800ms for faster response
+    complaintField.addEventListener('input', () => {
+        clearTimeout(analysisTimeout);
+        analysisTimeout = setTimeout(performAnalysis, 800);
+    });
+    
+    // Also analyze when checkboxes change
+    document.querySelectorAll('.checkbox-item input').forEach(checkbox => {
+        checkbox.addEventListener('change', performAnalysis);
+    });
+    
+    // Also analyze when vitals change
+    const vitalFields = ['newBP', 'newPulse', 'newTemp'];
+    vitalFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('input', () => {
+                if (complaintField.value.trim().length >= 3) {
+                    clearTimeout(analysisTimeout);
+                    analysisTimeout = setTimeout(performAnalysis, 800);
+                }
+            });
+        }
+    });
+    
+    console.log('✅ Real-time AI analysis initialized');
+}
+
+function displayAIAnalysis(analysis) {
+    const suggestionDiv = document.getElementById('aiSuggestion');
+    
+    const priorityColors = {
+        'red': '#ef5350',
+        'yellow': '#ffa726',
+        'green': '#66bb6a'
+    };
+    
+    const priorityEmojis = {
+        'red': '🚨',
+        'yellow': '⚠️',
+        'green': '✅'
+    };
+    
+    // ✅ UPDATED: Match the style from Image 1
+    suggestionDiv.style.background = priorityColors[analysis.priority];
+    suggestionDiv.style.color = 'white';
+    suggestionDiv.style.padding = '15px 20px';
+    suggestionDiv.style.borderRadius = '8px';
+    suggestionDiv.style.marginTop = '10px';
+    suggestionDiv.style.display = 'block';
+    suggestionDiv.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    
+    suggestionDiv.innerHTML = `
+        <div style="font-weight: bold; font-size: 18px; margin-bottom: 10px; color: white;">
+            ${priorityEmojis[analysis.priority]} AI Analysis: ${analysis.priority_label}
+        </div>
+        <div style="font-size: 14px; margin-bottom: 8px; color: white; line-height: 1.4;">
+            ${analysis.reasoning}
+        </div>
+        ${analysis.detected_symptoms.length > 0 ? `
+            <div style="font-size: 13px; margin-top: 10px; color: white;">
+                <strong>Detected:</strong> ${analysis.detected_symptoms.map(s => s.replace('_', ' ')).join(', ')}
+            </div>
+        ` : ''}
+        ${analysis.suggested_symptoms.length > 0 ? `
+            <div style="font-size: 12px; margin-top: 10px; color: white; opacity: 0.95; font-style: italic;">
+                💡 Consider checking: ${analysis.suggested_symptoms.map(s => s.replace('_', ' ')).join(', ')}
+            </div>
+        ` : ''}
+        <div style="font-size: 12px; margin-top: 10px; color: white; opacity: 0.9;">
+            <strong>Confidence:</strong> ${(analysis.confidence * 100).toFixed(0)}%
+        </div>
+    `;
+}
+
 // ==================== FORM HANDLERS ====================
 
 function setupFormHandlers() {
@@ -93,6 +270,48 @@ function setupFormHandlers() {
     if (searchForm) {
         searchForm.addEventListener('submit', handleSearchSubmit);
     }
+}
+
+// Missing search functionality fix
+const searchInput = document.getElementById('searchInput');
+if (searchInput) {
+    const resultsContainer = document.getElementById('searchResults');
+
+    searchInput.addEventListener('input', async (e) => {
+        const query = e.target.value.trim();
+
+        if (query.length < 2) {
+            resultsContainer.innerHTML = '';
+            return;
+        }
+
+        const response = await searchPatients(query);
+
+        if (response.success) {
+            const patients = response.data;
+
+            if (patients.length === 0) {
+                resultsContainer.innerHTML = '<p>No patients found.</p>';
+                return;
+            }
+
+            resultsContainer.innerHTML = patients.map(patient => `
+                <div class="search-result-item">
+                    <h4>${patient.name} 
+                        <span class="priority-tag ${patient.priority}">
+                            ${patient.priority.toUpperCase()}
+                        </span>
+                    </h4>
+                    <p>Age: ${patient.age}</p>
+                    <p>Contact: ${patient.contact}</p>
+                    <p>Status: ${patient.status}</p>
+                    <p><strong>Room:</strong> ${patient.assignedRoomNumber ? patient.assignedRoomNumber : '<em>Not Assigned</em>'}</p>
+                </div>
+            `).join('');
+        } else {
+            resultsContainer.innerHTML = `<p>Error: ${response.message}</p>`;
+        }
+    });
 }
 
 async function handleNewPatientSubmit(e) {
@@ -114,7 +333,7 @@ async function handleNewPatientSubmit(e) {
     const contact = document.getElementById('newContact').value.trim();
 
     if (!name || !contact) {
-        alert("⚠️ Please enter both name and contact number.");
+        await showWarning('Missing Information', 'Please enter both name and contact number.');
         return;
     }
 
@@ -123,20 +342,29 @@ async function handleNewPatientSubmit(e) {
 
     if (existResult.exists) {
         const existing = existResult.data;
-
-        // ✅ Use custom popup instead of alert
         await showPatientExists({
             name: existing.name,
             contact: existing.contact,
             status: existing.status?.toUpperCase() || "N/A",
             priority: existing.priority?.toUpperCase() || "N/A"
         });
-
-        return; // Stop here – don't register again
+        return;
     }
 
+    // Determine priority: Use AI analysis if available, otherwise fallback
+    let priority;
+    let prioritySource = 'manual';
     
-    const priority = calculatePriority(symptoms, vitals);
+    if (aiAnalysisResult && aiAnalysisResult.priority) {
+        priority = aiAnalysisResult.priority;
+        prioritySource = 'AI';
+        console.log(`✅ Using AI-determined priority: ${priority} (${aiAnalysisResult.priority_label})`);
+    } else {
+        // Fallback to manual calculation
+        priority = calculatePriority(symptoms, vitals);
+        prioritySource = 'manual';
+        console.log(`⚠️ Using manual priority calculation: ${priority}`);
+    }
     
     const patientData = {
         name: document.getElementById('newName').value,
@@ -145,7 +373,8 @@ async function handleNewPatientSubmit(e) {
         complaint: document.getElementById('newComplaint').value,
         symptoms: symptoms,
         vitals: vitals,
-        priority: priority
+        priority: priority,
+        notes: aiAnalysisResult ? `AI Analysis: ${aiAnalysisResult.reasoning} (Confidence: ${(aiAnalysisResult.confidence * 100).toFixed(0)}%)` : ''
     };
     
     const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -156,16 +385,21 @@ async function handleNewPatientSubmit(e) {
     const result = await addPatient(patientData);
     
     if (result.success) {
-        // Use custom popup instead of alert
+        // Show success with AI indication
+        const message = prioritySource === 'AI' 
+            ? `Patient registered with AI-determined priority: ${priority.toUpperCase()}` 
+            : `Patient registered with priority: ${priority.toUpperCase()}`;
+        
         await showPatientRegistered(priority, result.id);
         
-        // Reset form
+        // Reset form and AI analysis
         e.target.reset();
+        aiAnalysisResult = null;
+        document.getElementById('aiSuggestion').style.display = 'none';
         
         // Reload statistics
         loadStatistics();
     } else {
-        // Use custom error popup instead of alert
         await showError('Registration Failed', result.message);
     }
     
@@ -234,6 +468,7 @@ function renderQueue(patients) {
                     <p><strong>Complaint:</strong> ${patient.complaint}</p>
                     <p style="margin-top:6px;"><strong>Appointment:</strong> ${patient.appointmentDate || 'TBD'} — ${patient.appointmentStartTime || ''} to ${patient.appointmentEndTime || ''}</p>
                     <p><strong>Wait Time:</strong> ${waitTime}</p>
+                    ${patient.notes ? `<p style="font-size: 12px; color: #666; font-style: italic; margin-top: 4px;">🤖 ${patient.notes}</p>` : ''}
                     <span class="priority-badge priority-${patient.priority}">${priorityText}</span>
                 </div>
                 <div class="patient-actions">
@@ -256,7 +491,6 @@ function displaySearchResults(results) {
         const checkInDate = patient.checkInTime?.toDate?.() || new Date();
         const formattedDate = checkInDate.toLocaleString();
         
-        // Check if room is assigned
         const roomInfo = patient.assignedRoomNumber 
             ? `<p><strong>Room:</strong> 🚪 ${patient.assignedRoomNumber}</p>` 
             : '<p><strong>Room:</strong> <em style="color: #999;">Not Assigned</em></p>';
@@ -270,6 +504,7 @@ function displaySearchResults(results) {
                 <p><strong>Status:</strong> ${patient.status.toUpperCase()}</p>
                 <p><strong>Check-in:</strong> ${formattedDate}</p>
                 ${roomInfo}
+                ${patient.notes ? `<p style="font-size: 12px; color: #666; font-style: italic;">🤖 ${patient.notes}</p>` : ''}
                 <span class="priority-badge priority-${patient.priority}">${priorityText}</span>
             </div>
         `;
@@ -283,7 +518,6 @@ window.viewPatientDetails = async function(patientId) {
         const patient = result.data;
         const waitTime = formatWaitTime(patient.checkInTime);
         
-        // Use custom popup instead of alert
         await showPatientDetails(patient, waitTime);
     } else {
         await showError('Error', result.message);
@@ -387,7 +621,6 @@ window.showRoomPatientDetails = async function(roomId, patientId, patientName, r
     const vitals = patient.vitals || {};
     const waitTime = formatWaitTime(patient.checkInTime);
     
-    // Create custom popup with discharge button
     const modal = document.createElement('div');
     modal.id = 'patientDetailsModal';
     modal.style.cssText = `
@@ -405,7 +638,7 @@ window.showRoomPatientDetails = async function(roomId, patientId, patientName, r
     
     modal.innerHTML = `
         <div style="background: white; padding: 30px; border-radius: 15px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
-            <h2 style="color: #667eea; margin-bottom: 20px;">🏥 Room ${roomNumber} - Patient Details</h2>
+            <h2 style="color: #667eea; margin-bottom: 20px;">🥼 Room ${roomNumber} - Patient Details</h2>
             
             <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
                 <h3 style="margin-bottom: 15px; color: #333;">👤 ${patient.name}</h3>
@@ -433,8 +666,8 @@ window.showRoomPatientDetails = async function(roomId, patientId, patientName, r
             
             ${patient.notes ? `
             <div style="background: #f3e5f5; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <h4 style="margin-bottom: 10px; color: #7b1fa2;">📝 Notes</h4>
-                <p>${patient.notes}</p>
+                <h4 style="margin-bottom: 10px; color: #7b1fa2;">📝 AI Analysis</h4>
+                <p style="font-size: 14px;">${patient.notes}</p>
             </div>
             ` : ''}
             
@@ -471,7 +704,6 @@ window.closePatientDetailsModal = function() {
 }
 
 window.dischargePatientFromRoom = async function(patientId, patientName, roomId, roomNumber) {
-    // Use custom confirm popup instead of alert
     const confirmed = await showConfirmDischarge(patientName, roomNumber);
     
     if (confirmed) {
@@ -561,18 +793,15 @@ window.closeRoomModal = function() {
 }
 
 window.confirmDischarge = async function(patientId, patientName) {
-    // Get patient details first
     const patientResult = await getPatientById(patientId);
     let roomId = null;
     let roomNumber = null;
     
     if (patientResult.success && patientResult.data.assignedRoom) {
         roomId = patientResult.data.assignedRoom;
-        // You might need to fetch room details to get room number
-        // For now, we'll just use the room ID
+        roomNumber = patientResult.data.assignedRoomNumber;
     }
     
-    // Use custom confirm popup
     const confirmed = await showConfirmDischarge(patientName, roomNumber);
     
     if (confirmed) {
@@ -585,44 +814,4 @@ window.confirmDischarge = async function(patientId, patientName) {
             await showError('Discharge Failed', result.message);
         }
     }
-}
-
-const searchInput = document.getElementById('searchInput');
-const resultsContainer = document.getElementById('searchResults');
-
-searchInput.addEventListener('input', async (e) => {
-    const query = e.target.value.trim();
-
-    if (query.length < 2) {
-        resultsContainer.innerHTML = '';
-        return;
-    }
-
-    const response = await searchPatients(query);
-
-    if (response.success) {
-        const patients = response.data;
-
-        if (patients.length === 0) {
-            resultsContainer.innerHTML = '<p>No patients found.</p>';
-            return;
-        }
-
-        // Render results – includes Room info
-        resultsContainer.innerHTML = patients.map(patient => `
-            <div class="search-result-item">
-                <h4>${patient.name} 
-                    <span class="priority-tag ${patient.priority}">
-                        ${patient.priority.toUpperCase()}
-                    </span>
-                </h4>
-                <p>Age: ${patient.age}</p>
-                <p>Contact: ${patient.contact}</p>
-                <p>Status: ${patient.status}</p>
-                <p><strong>Room:</strong> ${patient.assignedRoomNumber ? patient.assignedRoomNumber : '<em>Not Assigned</em>'}</p>
-            </div>
-        `).join('');
-    } else {
-        resultsContainer.innerHTML = `<p>Error: ${response.message}</p>`;
-    }
-});
+};
