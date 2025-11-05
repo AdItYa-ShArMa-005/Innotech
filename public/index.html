@@ -9,8 +9,15 @@
 <body>
     <div class="container">
         <header>
-            <h1>🏥 Emergency Triage & Routing System</h1>
-            <p>Fast, Efficient, Life-Saving Patient Management</p>
+            <div class="header-content">
+                <div class="logo-container">
+                    <img src="logo.jpg" alt="Logo" class="header-logo">
+                </div>
+                <div class="header-text">
+                    <h1>Emergency Triage & Routing System</h1>
+                    <p>Fast, Efficient, Life-Saving Patient Management</p>
+                </div>
+            </div>
         </header>
 
         <div class="stats-grid">
@@ -124,11 +131,8 @@
         <!-- Rooms Section -->
         <div class="queue-section" style="margin-top: 30px;">
             <h2>🏥 Room Management</h2>
-            <!-- <div style="margin-bottom: 20px;">
-                <button onclick="initializeRooms()" style="width: auto; padding: 10px 20px;">Initialize 10 Rooms</button>
-            </div> -->
             <div id="roomsList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
-                <p style="text-align: center; color: #999; padding: 40px; grid-column: 1/-1;">No rooms available. Click "Initialize Rooms" to create.</p>
+                <p style="text-align: center; color: #999; padding: 40px; grid-column: 1/-1;">Loading rooms...</p>
             </div>
         </div>
     </div>
@@ -150,13 +154,12 @@
     <script>
         function logoutStaff() {
             localStorage.clear();
-             window.location.href = "staff-login.html";
-            }
+            window.location.href = "staff-login.html";
+        }
     </script>
 
     <script src="firebase-config.js"></script>
     <script src="protected-route.js"></script>
-    <!-- Your application script -->
     <script type="module" src="script.js"></script>
 </body>
 </html>

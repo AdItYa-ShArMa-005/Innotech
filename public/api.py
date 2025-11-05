@@ -41,6 +41,7 @@ CRITICAL_KEYWORDS = {
     'seizure': ['seizure', 'convulsion', 'fitting', 'epileptic'],
     'head_injury': ['head injury', 'head trauma', 'skull fracture', 'brain injury'],
     'severe_pain': ['excruciating', 'worst pain ever', 'unbearable pain', '10/10 pain'],
+    'jaundice': ['yellowness', 'dark urine']
 }
 
 URGENT_KEYWORDS = {

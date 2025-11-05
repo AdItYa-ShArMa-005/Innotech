@@ -26,6 +26,28 @@ header {
     border-radius: 15px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     margin-bottom: 30px;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+}
+
+.logo-container {
+    flex-shrink: 0;
+}
+
+.header-logo {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.header-text {
+    flex: 1;
     text-align: center;
 }
 
@@ -250,6 +272,20 @@ button:active {
     .main-section { grid-template-columns: 1fr; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .checkbox-group { grid-template-columns: 1fr; }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 20px;
+    }
+    
+    .header-text {
+        text-align: center;
+    }
+    
+    header h1 {
+        font-size: 1.8em;
+    }
 }
 
 .room-card {

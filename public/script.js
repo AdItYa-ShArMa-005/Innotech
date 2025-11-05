@@ -68,12 +68,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         await addRoom({roomNumber: `R${4}`});
         await addRoom({roomNumber: `R${5}`});
         await addRoom({roomNumber: `R${6}`});
-        await addRoom({roomNumber: `R${7}`});
-        await addRoom({roomNumber: `R${8}`});
-        await addRoom({roomNumber: `R${9}`});
-        await addRoom({roomNumber: `R${10}`});
-        await addRoom({roomNumber: `R${11}`});
-        await addRoom({roomNumber: `R${12}`});
     }
     
     startRoomUpdates();
